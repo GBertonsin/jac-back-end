@@ -1,0 +1,177 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  ORGANIZER
+  PARTICIPANT
+}
+
+enum RegistrationStatus {
+  REGISTERED
+  CANCELLED
+}
+
+enum CheckinSource {
+  QR
+  GEO
+}
+
+enum RedemptionStatus {
+  REQUESTED
+  APPROVED
+  FULFILLED
+  REJECTED
+}
+
+enum PointsReason {
+  EVENT_CHECKIN
+  ADJUSTMENT
+  REDEMPTION
+}
+
+model User {
+  id           String @id @default(cuid())
+  name         String
+  email        String @unique
+  passwordHash String
+  role         Role   @default(PARTICIPANT)
+
+  // Pontuação atual (mantida por regras de aplicação)
+  points Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdEvents Event[]        @relation("UserCreatedEvents")
+  registrations Registration[]
+  redemptions   Redemption[]
+  pointsLedger  PointsLedger[]
+}
+
+model Event {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  // Horários
+  startsAt        DateTime
+  endsAt          DateTime
+  // Localização física (opcional)
+  locationName    String?
+  address         String?
+  // Geofence (opcional)
+  geofenceLat     Float?
+  geofenceLng     Float?
+  geofenceRadiusM Int? // raio em metros (ex.: 100)
+  requireGeo      Boolean  @default(false)
+  // Regras de presença
+  minStayMinutes  Int      @default(0)
+  // Recompensa por presença válida
+  pointsReward    Int      @default(0)
+
+  capacity Int? // opcional
+  isActive Boolean @default(true)
+
+  createdById String
+  createdBy   User   @relation("UserCreatedEvents", fields: [createdById], references: [id])
+
+  registrations Registration[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([startsAt])
+  @@index([isActive])
+}
+
+model Registration {
+  id        String             @id @default(cuid())
+  userId    String
+  eventId   String
+  status    RegistrationStatus @default(REGISTERED)
+  // QR único para validar presença
+  qrToken   String             @unique
+  createdAt DateTime           @default(now())
+
+  user     User      @relation(fields: [userId], references: [id])
+  event    Event     @relation(fields: [eventId], references: [id])
+  checkins Checkin[]
+
+  @@unique([userId, eventId]) // 1 inscrição por usuário por evento
+  @@index([eventId, status])
+}
+
+model Checkin {
+  id             String        @id @default(cuid())
+  registrationId String
+  source         CheckinSource
+  // Janela de presença
+  enteredAt      DateTime      @default(now())
+  exitedAt       DateTime?
+  // Dados de localização (se GEO)
+  lat            Float?
+  lng            Float?
+  accuracyM      Float?
+  // Duração calculada (segundos)
+  staySeconds    Int?
+
+  registration Registration @relation(fields: [registrationId], references: [id])
+
+  @@index([registrationId])
+  @@index([enteredAt])
+}
+
+model Reward {
+  id         String  @id @default(cuid())
+  title      String
+  details    String?
+  costPoints Int
+  stock      Int     @default(0)
+  active     Boolean @default(true)
+
+  redemptions Redemption[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([active])
+}
+
+model Redemption {
+  id          String           @id @default(cuid())
+  rewardId    String
+  userId      String
+  status      RedemptionStatus @default(REQUESTED)
+  requestedAt DateTime         @default(now())
+  approvedAt  DateTime?
+  fulfilledAt DateTime?
+  rejectedAt  DateTime?
+
+  reward Reward @relation(fields: [rewardId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model PointsLedger {
+  id        String       @id @default(cuid())
+  userId    String
+  delta     Int // +ganho / -débito
+  reason    PointsReason
+  refType   String? // "Event", "Redemption"...
+  refId     String? // id da referência
+  createdAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
