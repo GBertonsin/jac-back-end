@@ -1,23 +1,27 @@
-// src/modules/registrations/registrations.routes.ts
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import { auth } from "../../core/auth";
+import { validate } from "../../core/validate";
+import { eventIdParamSchema, idParamSchema } from "./registrations.schemas";
+import { registrationsController } from "./registrations.controller";
 
 const router = Router();
 
-router.post("/", auth(), (_req: Request, res: Response) => {
-  return res.status(501).json({ message: "Not implemented: create registration" });
-});
+// Inscrever no evento
+router.post("/events/:eventId/register",
+  auth(), validate(eventIdParamSchema, "params"),
+  registrationsController.registerOnEvent
+);
 
-router.get("/event/:eventId", auth(["ORGANIZER", "ADMIN"]), (_req: Request, res: Response) => {
-  return res.status(501).json({ message: "Not implemented: list registrations by event" });
-});
+// Listar inscrições de um evento (criador/organizer/admin)
+router.get("/events/:eventId/registrations",
+  auth(), validate(eventIdParamSchema, "params"),
+  registrationsController.listByEvent
+);
 
-router.get("/me", auth(), (_req: Request, res: Response) => {
-  return res.status(501).json({ message: "Not implemented: list my registrations" });
-});
-
-router.delete("/:id", auth(), (_req: Request, res: Response) => {
-  return res.status(501).json({ message: "Not implemented: cancel registration" });
-});
+// Cancelar inscrição (próprio usuário / criador / admin/org)
+router.delete("/:id",
+  auth(), validate(idParamSchema, "params"),
+  registrationsController.cancel
+);
 
 export default router;

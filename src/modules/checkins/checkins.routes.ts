@@ -1,23 +1,15 @@
-// src/modules/checkins/checkins.routes.ts
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import { auth } from "../../core/auth";
+import { validate } from "../../core/validate";
+import { checkinByQrSchema, checkoutByQrSchema, geoCheckSchema } from "./checkins.schemas";
+import { checkinsController } from "./checkins.controller"; // <-- import NOMEADO
 
 const router = Router();
 
-router.post("/qr/checkin", auth(), (_req: Request, res: Response) => {
-  return res.status(501).json({ message: "Not implemented: QR check-in" });
-});
+router.post("/qr/checkin",  auth(), validate(checkinByQrSchema),  checkinsController.checkinByQr);
+router.post("/qr/checkout", auth(), validate(checkoutByQrSchema), checkinsController.checkoutByQr);
 
-router.post("/qr/checkout", auth(), (_req: Request, res: Response) => {
-  return res.status(501).json({ message: "Not implemented: QR check-out" });
-});
+router.post("/geo/checkin",  auth(), validate(geoCheckSchema), checkinsController.checkinByGeo);
+router.post("/geo/checkout", auth(), validate(geoCheckSchema), checkinsController.checkoutByGeo);
 
-router.post("/geo/checkin", auth(), (_req: Request, res: Response) => {
-  return res.status(501).json({ message: "Not implemented: GEO check-in" });
-});
-
-router.post("/geo/checkout", auth(), (_req: Request, res: Response) => {
-  return res.status(501).json({ message: "Not implemented: GEO check-out" });
-});
-
-export default router;
+export default router; // <-- export DEFAULT do router
